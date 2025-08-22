@@ -1,0 +1,8 @@
+# Minimal Requirements for Enhanced Agentic RAG System
+# Only essential dependencies needed to run the pipeline
+
+openai>=1.0.0
+qdrant-client>=1.7.0
+python-dotenv>=1.0.0
+numpy>=1.24.0
+tqdm>=4.65.0

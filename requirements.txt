@@ -1,0 +1,54 @@
+# Enhanced Agentic RAG System Requirements
+# Core dependencies for the thesis RAG pipeline
+
+# OpenAI API client
+openai>=1.0.0
+
+# Vector database client
+qdrant-client>=1.7.0
+
+# Environment variable management
+python-dotenv>=1.0.0
+
+# Numerical computing
+numpy>=1.24.0
+
+# Progress bars
+tqdm>=4.65.0
+
+# Path handling and file operations
+pathlib2>=2.3.7; python_version < "3.4"
+
+# JSON and CSV processing
+# (built-in with Python 3.x)
+
+# Hash functions
+# (built-in with Python 3.x)
+
+# Concurrent processing
+# (built-in with Python 3.x)
+
+# Logging
+# (built-in with Python 3.x)
+
+# Type hints
+# (built-in with Python 3.6+)
+
+# Optional: For enhanced PDF processing (if using MinerU)
+# mineru>=0.1.0
+
+# Optional: For image processing (if needed)
+# Pillow>=10.0.0
+
+# Optional: For advanced text processing
+# nltk>=3.8.1
+# spacy>=3.6.0
+
+# Optional: For better performance
+# torch>=2.0.0
+# transformers>=4.30.0
+
+# Development dependencies (optional)
+# pytest>=7.4.0
+# black>=23.0.0
+# flake8>=6.0.0

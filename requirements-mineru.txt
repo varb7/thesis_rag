@@ -1,0 +1,20 @@
+# MinerU Processor Requirements
+# Dependencies needed for PDF processing with MinerU
+
+# Core MinerU
+mineru>=0.1.0
+
+# Image processing (for image extraction)
+Pillow>=10.0.0
+
+# Progress tracking
+tqdm>=4.65.0
+
+# Path handling
+pathlib2>=2.3.7; python_version < "3.4"
+
+# Logging and file operations
+# (built-in with Python 3.x)
+
+# Note: Install with: pip install -r requirements-mineru.txt
+# This is separate from the main RAG system requirements
