@@ -1,0 +1,11 @@
+# Core dependencies for Modular Agentic RAG System
+semantic-kernel==1.35.3
+openai>=1.0.0
+qdrant-client>=1.7.0
+python-dotenv>=1.0.0
+numpy>=1.24.0
+
+# Optional: For enhanced features
+# transformers>=4.30.0  # For local embeddings
+# torch>=2.0.0         # PyTorch backend
+# sentence-transformers>=2.2.0  # For local sentence embeddings
