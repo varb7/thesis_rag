@@ -31,12 +31,10 @@ load_dotenv()
 
 # Configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "agenticragdb")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "text-embedding-3-small")
 GPT_MODEL = os.getenv("GPT_MODEL", "gpt-4o")
 VLM_MODEL = os.getenv("VLM_MODEL", "gpt-4-vision-preview")
-QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 
 @dataclass
 class ChatMessage:
@@ -242,7 +240,7 @@ class SemanticKernelRAG:
         self.memory_store = None  # We'll use our custom memory instead
         
         # Initialize Qdrant client
-        self.qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+        self.qdrant_client = QdrantClient(path="./qdrant_local")
         
         # Initialize OpenAI client for embeddings
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)

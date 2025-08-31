@@ -38,7 +38,7 @@ def deterministic_id(doc_id: str, section: str, text: str, prefix_len: int = 64)
 
 def load_markdown_content(md_path: str) -> List[Dict]:
     """Load and parse markdown content into structured blocks"""
-    print(f"📖 Loading markdown from: {md_path}")
+    print(f" Loading markdown from: {md_path}")
     
     with open(md_path, 'r', encoding='utf-8') as f:
         content = f.read()
@@ -72,7 +72,7 @@ def load_markdown_content(md_path: str) -> List[Dict]:
     if current_content.strip():
         blocks.extend(create_blocks_from_text(current_content.strip(), current_section))
     
-    print(f"📚 Created {len(blocks)} text blocks from markdown")
+    print(f" Created {len(blocks)} text blocks from markdown")
     return blocks
 
 def create_blocks_from_text(text: str, section: str) -> List[Dict]:
@@ -190,7 +190,7 @@ def ensure_collection(client: QdrantClient):
     """Ensure the collection exists with proper configuration"""
     names = {c.name for c in client.get_collections().collections}
     if COLLECTION not in names:
-        print(f"🔧 Creating collection: {COLLECTION}")
+        print(f" Creating collection: {COLLECTION}")
         client.create_collection(
             collection_name=COLLECTION,
             vectors_config=qm.VectorParams(size=EMBED_DIM, distance=qm.Distance.COSINE),
@@ -201,11 +201,11 @@ def ensure_collection(client: QdrantClient):
         client.create_payload_index(COLLECTION, "section", field_type=qm.PayloadSchemaType.KEYWORD)
         client.create_payload_index(COLLECTION, "content_type", field_type=qm.PayloadSchemaType.KEYWORD)
     else:
-        print(f"✅ Collection {COLLECTION} already exists")
+        print(f" Collection {COLLECTION} already exists")
 
 def embed_texts(texts: List[str]) -> List[List[float]]:
     """Generate embeddings using OpenAI"""
-    print(f"🧠 Generating embeddings for {len(texts)} text chunks...")
+    print(f" Generating embeddings for {len(texts)} text chunks...")
     
     client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     embeddings = []
@@ -233,7 +233,7 @@ def upsert(client: QdrantClient, payloads: List[Dict], vectors: List[List[float]
         ))
     
     if points:
-        print(f"💾 Upserting {len(points)} points to Qdrant...")
+        print(f" Upserting {len(points)} points to Qdrant...")
         client.upsert(collection_name=COLLECTION, points=points)
 
 def build_payloads(merged_blocks: List[Dict], doc_id: str, source_md: str) -> List[Dict]:
@@ -262,16 +262,16 @@ def main():
     
     folder_path = Path(args.folder)
     if not folder_path.exists():
-        print(f"❌ Folder not found: {folder_path}")
+        print(f" Folder not found: {folder_path}")
         return
     
     # Find markdown files
     md_files = list(folder_path.rglob("*.md"))
     if not md_files:
-        print(f"❌ No markdown files found in: {folder_path}")
+        print(f" No markdown files found in: {folder_path}")
         return
     
-    print(f"📁 Found {len(md_files)} markdown files")
+    print(f" Found {len(md_files)} markdown files")
     
     # Initialize Qdrant client
     client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
@@ -281,7 +281,7 @@ def main():
     total_chunks = 0
     
     for md_file in md_files:
-        print(f"\n📖 Processing: {md_file.name}")
+        print(f"\n Processing: {md_file.name}")
         
         # Extract doc_id from filename or use provided one
         doc_id = args.doc_id or md_file.stem
@@ -289,17 +289,17 @@ def main():
         # Load and process markdown
         blocks = load_markdown_content(str(md_file))
         if not blocks:
-            print(f"⚠️  No content extracted from {md_file.name}")
+            print(f"  No content extracted from {md_file.name}")
             continue
         
         # Merge blocks
         merged_blocks = merge_blocks(blocks)
-        print(f"📝 Blocks: {len(blocks)} → Chunks: {len(merged_blocks)}")
+        print(f" Blocks: {len(blocks)} → Chunks: {len(merged_blocks)}")
         
         # Build payloads
         payloads = build_payloads(merged_blocks, doc_id, str(md_file))
         if not payloads:
-            print(f"⚠️  No payloads created for {md_file.name}")
+            print(f"  No payloads created for {md_file.name}")
             continue
         
         # Generate embeddings
@@ -312,9 +312,9 @@ def main():
         total_blocks += len(blocks)
         total_chunks += len(merged_blocks)
     
-    print(f"\n🎉 Ingestion complete!")
-    print(f"📊 Total blocks processed: {total_blocks}")
-    print(f"📊 Total chunks ingested: {total_chunks}")
+    print(f"\n Ingestion complete!")
+    print(f" Total blocks processed: {total_blocks}")
+    print(f" Total chunks ingested: {total_chunks}")
 
 if __name__ == "__main__":
     main()

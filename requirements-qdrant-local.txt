@@ -1,0 +1,10 @@
+# Qdrant Local Ingestion System Requirements
+# Full-featured vector database running locally
+
+# Core dependencies
+qdrant-client>=1.7.0  # Qdrant client library
+openai>=1.0.0         # OpenAI API for embeddings
+python-dotenv>=1.0.0  # Environment variable management
+
+# Optional: For better performance
+# numpy>=1.24.0       # Already included with qdrant-client
