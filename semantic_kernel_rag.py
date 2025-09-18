@@ -240,7 +240,9 @@ class SemanticKernelRAG:
         self.memory_store = None  # We'll use our custom memory instead
         
         # Initialize Qdrant client
-        self.qdrant_client = QdrantClient(path="./qdrant_local")
+        QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+        QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+        self.qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
         
         # Initialize OpenAI client for embeddings
         self.openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
@@ -267,18 +269,18 @@ class SemanticKernelRAG:
         self.intent_function = self.kernel.add_function(
             "rag_plugin",
             function_name="detect_intent",
-            prompt="""Analyze the user's query and determine their intent with confidence scores (0-1):
+            prompt="""Analysiere die Benutzeranfrage und bestimme die Absicht mit Konfidenzwerten (0-1):
 
-INTENT TYPES:
-- text_content: Looking for general text content, explanations, descriptions
-- table_data: Looking for numerical data, comparisons, statistics, tables
-- figure_caption: Looking for figure descriptions, visual content, charts
-- methodology: Looking for methods, algorithms, procedures
-- results: Looking for experimental results, findings, outcomes
+INTENTIONSTYPEN:
+- text_content: Suche nach allgemeinem Textinhalt, Erklärungen, Beschreibungen
+- table_data: Suche nach numerischen Daten, Vergleichen, Statistiken, Tabellen
+- figure_caption: Suche nach Abbildungsbeschreibungen, visuellen Inhalten, Diagrammen
+- methodology: Suche nach Methoden, Algorithmen, Verfahren
+- results: Suche nach experimentellen Ergebnissen, Befunden, Ergebnissen
 
-Return JSON with intent and confidence scores.
+Gib JSON mit Absicht und Konfidenzwerten zurück.
 
-User Query: {{$input}}""",
+Benutzeranfrage: {{$input}}""",
             description="Detect user intent from queries"
         )
         
@@ -286,12 +288,13 @@ User Query: {{$input}}""",
         self.hyde_function = self.kernel.add_function(
             "rag_plugin",
             function_name="hyde_generate",
-            prompt="""Based on the question, write a hypothetical answer that might be found in research documents.
-            Make it realistic and detailed, using the kind of language and content you'd expect to find.
+            prompt="""Basierend auf der Frage, schreibe eine hypothetische Antwort, die in Forschungsdokumenten gefunden werden könnte.
+            Mache sie realistisch und detailliert, verwende die Art von Sprache und Inhalt, die man erwarten würde.
+            Antworte auf Deutsch.
             
-            Question: {{$input}}
+            Frage: {{$input}}
             
-            Hypothetical answer:""",
+            Hypothetische Antwort:""",
             description="Generate hypothetical answers for HyDE retrieval"
         )
         
@@ -299,32 +302,33 @@ User Query: {{$input}}""",
         self.expand_function = self.kernel.add_function(
             "rag_plugin",
             function_name="expand_query",
-            prompt="""Generate {{$num_variants}} focused query variants that would help find relevant information. 
-            Each variant should focus on different aspects or use different terminology.
-            Return only the queries, one per line.
+            prompt="""Generiere {{$num_variants}} fokussierte Abfragevarianten, die helfen würden, relevante Informationen zu finden.
+            Jede Variante sollte sich auf verschiedene Aspekte konzentrieren oder verschiedene Terminologie verwenden.
+            Gib nur die Abfragen zurück, eine pro Zeile.
 
-            Original Query: {{$input}}
-            Number of Variants: {{$num_variants}}""",
+            Originale Abfrage: {{$input}}
+            Anzahl der Varianten: {{$num_variants}}""",
             description="Generate query variants for better coverage"
         )
         
         self.answer_function = self.kernel.add_function(
             "rag_plugin",
             function_name="generate_answer",
-            prompt="""You are an expert research assistant. Answer questions based on the provided document context.
+            prompt="""Du bist ein Experte für Forschungshilfe. Beantworte Fragen basierend auf dem bereitgestellten Dokumentenkontext.
 
-IMPORTANT RULES:
-1. Only use information from the provided context
-2. ALWAYS cite specific sources: "According to Source X (PDF Page Y, Section Z)..."
-3. Reference the section and page clearly
-4. If context is insufficient, acknowledge this clearly
-5. Provide comprehensive, well-structured answers
-6. Use exact terminology from the documents
+WICHTIGE REGELN:
+1. Verwende nur Informationen aus dem bereitgestellten Kontext
+2. ZITIERE IMMER spezifische Quellen: "Laut Quelle X (PDF-Seite Y, Abschnitt Z)..."
+3. Referenziere Abschnitt und Seite klar
+4. Wenn der Kontext unzureichend ist, gib dies klar zu erkennen
+5. Gib umfassende, gut strukturierte Antworten
+6. Verwende exakte Terminologie aus den Dokumenten
+7. Antworte IMMER auf Deutsch
 
-Context: {{$context}}
-Question: {{$input}}
+Kontext: {{$context}}
+Frage: {{$input}}
 
-Please provide a comprehensive answer based on the context above.""",
+Bitte gib eine umfassende Antwort basierend auf dem obigen Kontext.""",
             description="Generate comprehensive answers from context"
         )
     
@@ -361,11 +365,14 @@ Please provide a comprehensive answer based on the context above.""",
                     return parsed_result["intents"]
                 else:
                     # Try to find any numeric values
-                    return {k: v for k, v in parsed_result.items() if isinstance(v, (int, float))}
+                    numeric_values = {k: v for k, v in parsed_result.items() if isinstance(v, (int, float))}
+                    if numeric_values:
+                        return numeric_values
             
             # Fallback to default
             return {"text_content": 0.8, "table_data": 0.6, "figure_caption": 0.5}
         except Exception as e:
+            print(f"⚠️ Intent detection error: {e}")
             # Fallback to default
             return {"text_content": 0.8, "table_data": 0.6, "figure_caption": 0.5}
     
@@ -398,18 +405,18 @@ Please provide a comprehensive answer based on the context above.""",
         for i, chunk in enumerate(chunks, 1):
             pdf_page = chunk['page'] + 1
             context_parts.append(
-                f"Source {i}:\n"
-                f"  - Section: {chunk['section']}\n"
-                f"  - PDF Page: {pdf_page}\n"
-                f"  - Paper: {chunk['doc_id']}\n"
-                f"  - Content:\n{chunk['text']}\n"
+                f"Quelle {i}:\n"
+                f"  - Abschnitt: {chunk['section']}\n"
+                f"  - PDF-Seite: {pdf_page}\n"
+                f"  - Papier: {chunk['doc_id']}\n"
+                f"  - Inhalt:\n{chunk['text']}\n"
             )
         
         return "\n".join(context_parts)
     
     async def hyde_retrieval(self, query: str, limit: int = 5) -> List[Dict]:
         """HyDE retrieval with Semantic Kernel integration"""
-        print("🧠 Generating hypothetical answer for HyDE retrieval...")
+        print("�� Generiere hypothetische Antwort für HyDE-Retrieval...")
         
         try:
             # Use the dedicated HyDE function
@@ -438,7 +445,7 @@ Please provide a comprehensive answer based on the context above.""",
             return self._process_hits(text_hyde_hits)
             
         except Exception as e:
-            print(f"HyDE failed: {e}")
+            print(f"HyDE fehlgeschlagen: {e}")
             return []
         
     def _process_hits(self, hits) -> List[Dict]:
@@ -447,10 +454,12 @@ Please provide a comprehensive answer based on the context above.""",
         for hit in hits:
             chunks.append({
                 'text': hit.payload['text'],
+                'title': hit.payload.get('title', 'Unbekannter Titel'),
                 'page': hit.payload.get('page', 0),
                 'doc_id': hit.payload['doc_id'],
                 'block_type': hit.payload['block_type'],
-                'section': hit.payload.get('section', 'Unknown'),
+                'section': hit.payload.get('section', 'Unbekannt'),
+                'has_image': hit.payload.get('has_image', False),
                 'score': hit.score,
                 'vector': hit.vector
             })
@@ -458,15 +467,21 @@ Please provide a comprehensive answer based on the context above.""",
     
     async def retrieve_with_strategy(self, query: str, limit: int = 8) -> List[Dict]:
         """Multi-strategy retrieval using Semantic Kernel"""
-        print(f"🔍 Orchestrating retrieval for: {query}")
+        print(f"🔍 Orchestriere Retrieval für: {query}")
         
         # 1. Intent Detection using Semantic Kernel
         intent = await self.detect_intent(query)
-        print(f"🎯 Detected intent: {max(intent, key=intent.get)} (confidence: {max(intent.values()):.2f})")
+        
+        # Safety check for empty intent dictionary
+        if not intent or len(intent) == 0:
+            print("⚠️ Intent detection failed, using default intent")
+            intent = {"text_content": 0.8, "table_data": 0.6, "figure_caption": 0.5}
+        
+        print(f"🎯 Erkannte Absicht: {max(intent, key=intent.get)} (Konfidenz: {max(intent.values()):.2f})")
         
         # 2. Query Expansion using Semantic Kernel
         query_variants = await self.expand_query(query)
-        print(f"🔄 Generated {len(query_variants)} query variants")
+        print(f"🔄 Generiert {len(query_variants)} Abfragevarianten")
         
         # 3. Multi-Strategy Retrieval
         all_chunks = []
@@ -511,11 +526,11 @@ Please provide a comprehensive answer based on the context above.""",
                 text_variant_hits = [hit for hit in variant_hits if hit.payload.get('block_type') == 'text']
                 all_chunks.extend(self._process_hits(text_variant_hits))
             except Exception as e:
-                print(f"Variant retrieval failed: {e}")
+                print(f"Varianten-Retrieval fehlgeschlagen: {e}")
         
         # 4. Remove duplicates and apply MMR
         unique_chunks = self._remove_duplicates(all_chunks)
-        print(f"📚 Total unique TEXT chunks found: {len(unique_chunks)}")
+        print(f"📚 Insgesamt {len(unique_chunks)} einzigartige TEXT-Abschnitte gefunden")
         
         # 5. MMR diversification
         diversified_chunks = self.mmr_diversification(unique_chunks, original_vector, limit=limit)
@@ -536,7 +551,7 @@ Please provide a comprehensive answer based on the context above.""",
     def mmr_diversification(self, all_hits: List[Dict], query_vector: List[float], 
                           lambda_param: float = 0.5, limit: int = 8) -> List[Dict]:
         """MMR diversification for result selection"""
-        print("🔄 Applying MMR diversification...")
+        print("�� Wende MMR-Diversifizierung an...")
         
         if len(all_hits) <= limit:
             return all_hits
@@ -593,7 +608,7 @@ Please provide a comprehensive answer based on the context above.""",
     
     async def enhanced_retrieve_and_answer(self, query: str, session_id: str) -> Tuple[str, List[Dict]]:
         """Enhanced retrieval with memory integration"""
-        print(f"🚀 Enhanced retrieval for: {query}")
+        print(f"�� Erweiterte Suche für: {query}")
         
         # Get session memory
         session = self.memory_manager.get_session(session_id)
@@ -604,15 +619,15 @@ Please provide a comprehensive answer based on the context above.""",
         # Check for relevant previous context
         previous_context = session.get_query_context(query)
         if previous_context:
-            print(f"📚 Found relevant previous context from {previous_context.query}")
+            print(f"📚 Relevanter vorheriger Kontext von {previous_context.query} gefunden")
         
         # Get relevant chat history
         relevant_history = session.get_relevant_context(query)
         if relevant_history:
-            print(f"💬 Found {len(relevant_history)} relevant chat history items")
+            print(f"💬 {len(relevant_history)} relevante Chat-Historie-Elemente gefunden")
         
         # Standard text-based RAG
-        print("📚 Using standard text-based RAG...")
+        print("�� Verwende Standard-Text-basiertes RAG...")
         chunks = await self.retrieve_with_strategy(query)
         answer = await self.generate_answer(query, chunks)
         
@@ -640,16 +655,16 @@ Please provide a comprehensive answer based on the context above.""",
         if not session_id:
             session_id = str(uuid.uuid4())
         
-        print(f"🚀 Enhanced Agentic RAG System Ready! (Session: {session_id[:8]}...)")
-        print("Advanced features: Semantic Kernel, Memory Management, Multi-query expansion, HyDE, MMR")
-        print("Ask questions about your research documents. Type 'quit' to exit.")
+        print(f"�� Erweiterte Agentic RAG System bereit! (Session: {session_id[:8]}...)")
+        print("Erweiterte Funktionen: Semantic Kernel, Speicherverwaltung, Multi-Query-Expansion, HyDE, MMR")
+        print("Stellen Sie Fragen zu Ihren Forschungsdokumenten. Tippen Sie 'quit' zum Beenden.")
         print("-" * 60)
         
         while True:
-            query = input("\n❓ Your question: ").strip()
+            query = input("\n❓ Ihre Frage: ").strip()
             
             if query.lower() in ['quit', 'exit', 'q']:
-                print("👋 Goodbye!")
+                print("�� Auf Wiedersehen!")
                 break
             
             if not query:
@@ -661,24 +676,24 @@ Please provide a comprehensive answer based on the context above.""",
                 
                 # Display results
                 print("\n" + "="*70)
-                print("🚀 ENHANCED AGENTIC RAG ANSWER:")
+                print("�� ERWEITERTE AGENTIC RAG ANTWORT:")
                 print("="*70)
                 print(answer)
                 print("="*70)
                 
                 # Show sources
                 if sources:
-                    print("\n📚 Sources:")
+                    print("\n📚 Quellen:")
                     for i, source in enumerate(sources[:3], 1):
-                        print(f"  {i}. 📄 Text | Page {source.get('page', 'N/A')} | Section: {source.get('section', 'N/A')}")
-                        print(f"     Content: {source.get('text', 'N/A')[:100]}...")
+                        print(f"  {i}. 📄 Text | Seite {source.get('page', 'N/A')} | Abschnitt: {source.get('section', 'N/A')}")
+                        print(f"     Inhalt: {source.get('text', 'N/A')[:100]}...")
                 
                 # Show memory info
                 session = self.memory_manager.get_session(session_id)
-                print(f"\n💾 Memory: {len(session.messages)} messages, {len(session.query_history)} queries")
+                print(f"\n💾 Speicher: {len(session.messages)} Nachrichten, {len(session.query_history)} Abfragen")
                 
             except Exception as e:
-                print(f"❌ Error: {str(e)}")
+                print(f"❌ Fehler: {str(e)}")
     
     def get_session_info(self, session_id: str) -> Dict[str, Any]:
         """Get information about a session"""
@@ -692,7 +707,7 @@ Please provide a comprehensive answer based on the context above.""",
 if __name__ == "__main__":
     import asyncio
     # Initialize Semantic Kernel RAG system
-    rag = SemanticKernelRAG(base_path="mineru_out")
+    rag = SemanticKernelRAG(base_path="mineru_out_german")
     
     # Start chat with new session
     asyncio.run(rag.chat())
